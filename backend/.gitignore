@@ -1,0 +1,52 @@
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# dotenv environment variable files
+.env
+.env.*
+
+# Test coverage
+coverage
+.nyc_output
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+.output
+
+# Serverless directories
+.serverless/
+
+# Vite files
+.vite/
+vite.config.js.timestamp-*
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
