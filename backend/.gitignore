@@ -50,3 +50,6 @@ vite.config.js.timestamp-*
 # OS
 .DS_Store
 Thumbs.db
+
+# db
+*.db

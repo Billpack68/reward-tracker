@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import routes
+const rewardsRouter = require('./rewards');
 // const userRoutes = require('./user');
 
 // Middleware to log all requests
@@ -17,7 +18,7 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      users: '/users'
+      rewards: '/rewards'
     }
   });
 });
@@ -26,5 +27,8 @@ router.get('/', (req, res) => {
 router.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
+// Rewards routes
+router.use('/rewards', rewardsRouter);
 
 module.exports = router;

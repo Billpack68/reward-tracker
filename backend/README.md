@@ -12,6 +12,8 @@ backend/
 │   ├── middleware/      # Custom middleware
 │   ├── models/          # Data models
 │   └── server.js        # Main server file
+├── database/            # Database files
+├── test/                # Test files
 ├── .env                 # Environment variables
 ├── .gitignore           # Git ignore file
 └── package.json         # Dependencies and scripts
@@ -39,6 +41,8 @@ npm start
 
 - `GET /` - Welcome message
 - `GET /health` - Health check endpoint
+- `GET /rewards` - Get current rewards points
+- `PUT /rewards` - Update rewards points
 
 ## Dependencies
 

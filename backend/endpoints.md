@@ -13,9 +13,6 @@ Three endpoints:
 /completions
 - get /completions: returns completions for all habits for the last 7 days
 - get /completions/habit/:id: returns completions for habit with id :id for the last 7 days
-- post /completions: records a new completion (no ID needed in URL)
-- post /completions/habit/:id: records a completion for a specific habit
-
-/completions/:id
+- post /completions: records a new completion (habit ID should be in request body)
 - put /completions/:id: updates a specific completion (if needed)
 - delete /completions/:id: deletes a specific completion

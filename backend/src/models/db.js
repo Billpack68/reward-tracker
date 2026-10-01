@@ -2,7 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 // Create or connect to database
-const db = new sqlite3.Database('./habit-tracker.db');
+const db = new sqlite3.Database('./database/habit-tracker.db');
 
 // Initialize tables
 db.serialize(() => {
