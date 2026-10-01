@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Import routes
 const rewardsRouter = require('./rewards');
+const habitsRouter = require('./habits');
 // const userRoutes = require('./user');
 
 // Middleware to log all requests
@@ -18,7 +19,8 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      rewards: '/rewards'
+      rewards: '/rewards',
+      habits: '/habits'
     }
   });
 });
@@ -30,5 +32,8 @@ router.get('/health', (req, res) => {
 
 // Rewards routes
 router.use('/rewards', rewardsRouter);
+
+// Habits routes
+router.use('/habits', habitsRouter);
 
 module.exports = router;
