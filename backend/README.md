@@ -43,6 +43,15 @@ npm start
 - `GET /health` - Health check endpoint
 - `GET /rewards` - Get current rewards points
 - `PUT /rewards` - Update rewards points
+- `GET /habits` - Get all habits
+- `POST /habits` - Create a new habit
+- `PUT /habits/:id` - Update an existing habit
+- `DELETE /habits/:id` - Delete a habit
+- `GET /completions` - Get all completions
+- `GET /completions/habit/:id` - Get completions for a specific habit
+- `POST /completions` - Create a new completion
+- `PUT /completions/:id` - Update an existing completion
+- `DELETE /completions/:id` - Delete a completion
 
 ## Dependencies
 
