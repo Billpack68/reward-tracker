@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const habitsModel = require('../models/habitsModel');
 
+const normalizeMaxCompletions = (value) => (
+  typeof value === 'string' && value.trim().toLowerCase() === 'unlimited'
+    ? 0
+    : value
+);
+
 // Get all habits
 router.get('/', async (req, res) => {
   try {
@@ -27,7 +33,7 @@ router.post('/', async (req, res) => {
       name,
       description,
       value,
-      max_completions_per_day
+      max_completions_per_day: normalizeMaxCompletions(max_completions_per_day)
     });
     
     res.status(201).json({ 
@@ -55,7 +61,7 @@ router.put('/:id', async (req, res) => {
       name,
       description,
       value,
-      max_completions_per_day
+      max_completions_per_day: normalizeMaxCompletions(max_completions_per_day)
     });
     
     if (changes === 0) {

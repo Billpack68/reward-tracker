@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
+import './App.new.css';
 import { api } from './api';
 
 // Define types for our data structures
@@ -21,6 +21,32 @@ const getTodayInMountainTime = (): string => {
   return mountainTime.toISOString().split('T')[0];
 };
 
+const parseMaxCompletions = (value: string): number | null => {
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!/^[1-9]\d*$/.test(normalizedValue)) {
+    return null;
+  }
+
+  const parsedValue = Number(normalizedValue);
+  return Number.isSafeInteger(parsedValue) ? parsedValue : null;
+};
+
+const parseHabitValue = (value: string): number | null => {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue === '') {
+    return 0;
+  }
+
+  if (!/^-?\d+$/.test(normalizedValue)) {
+    return null;
+  }
+
+  const parsedValue = Number(normalizedValue);
+  return Number.isSafeInteger(parsedValue) ? parsedValue : null;
+};
+
 function App() {
   // State for rewards earned
   const [rewardsEarned, setRewardsEarned] = useState<number>(0);
@@ -30,6 +56,9 @@ function App() {
   
   // State for new habit form
   const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
+  const [valueInput, setValueInput] = useState<string>('');
+  const [maxCompletionsInput, setMaxCompletionsInput] = useState<string>('1');
+  const [isUnlimited, setIsUnlimited] = useState<boolean>(false);
   const [newHabit, setNewHabit] = useState<Omit<Habit, 'id' | 'completedToday'>>({ 
     name: '', 
     description: '', 
@@ -82,10 +111,22 @@ function App() {
   // Handle creating a new habit
   const handleCreateHabit = async () => {
     if (newHabit.name.trim() === '') return;
+
+    const maxCompletions = isUnlimited ? 0 : parseMaxCompletions(maxCompletionsInput);
+    if (maxCompletions === null) return;
+
+    const habitValue = parseHabitValue(valueInput);
+    if (habitValue === null) return;
+
+    const habitToCreate = {
+      ...newHabit,
+      value: habitValue,
+      max_completions_per_day: maxCompletions,
+    };
     
     try {
       // Create the new habit via API
-      const createdHabit = await api.createHabit(newHabit);
+      await api.createHabit(habitToCreate);
       
       // Refresh habits list to get updated data
       const habitData = await api.getHabits();
@@ -115,6 +156,9 @@ function App() {
       setHabits(updatedHabits);
       
       setShowCreateForm(false);
+      setValueInput('');
+      setMaxCompletionsInput('1');
+      setIsUnlimited(false);
       setNewHabit({ name: '', description: '', value: 0, max_completions_per_day: 1 });
     } catch (error) {
       console.error('Error creating habit:', error);
@@ -210,39 +254,56 @@ function App() {
 
   // Handle input change for maxCompletionsPerDay
   const handleMaxCompletionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === 'unlimited') {
-      setNewHabit({...newHabit, max_completions_per_day: 0});
-    } else {
-      setNewHabit({...newHabit, max_completions_per_day: parseInt(value) || 1});
+    const inputValue = e.target.value;
+    setMaxCompletionsInput(inputValue);
+
+    const parsedValue = parseMaxCompletions(inputValue);
+    if (parsedValue !== null) {
+      setNewHabit({...newHabit, max_completions_per_day: parsedValue});
     }
   };
 
-  // Reset daily completions (this would typically be called once per day)
-  const resetDailyCompletions = async () => {
-    // In a real app, this would involve calling an API to reset completions
-    // For now, we'll just reset the local state
-    setHabits(habits.map(habit => ({ ...habit, completedToday: 0 })));
+  const handleUnlimitedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const unlimited = e.target.checked;
+    setIsUnlimited(unlimited);
+
+    if (unlimited) {
+      setNewHabit({...newHabit, max_completions_per_day: 0});
+      return;
+    }
+
+    const parsedValue = parseMaxCompletions(maxCompletionsInput) || 1;
+    setMaxCompletionsInput(String(parsedValue));
+    setNewHabit({...newHabit, max_completions_per_day: parsedValue});
   };
 
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Reward Tracker</h1>
+        <h1>My habits</h1>
         <div className="rewards-display">
-          <p>Rewards Earned: {rewardsEarned}</p>
+          <p>{rewardsEarned} points</p>
         </div>
         
         <div className="habits-container">
           <h2>Your Habits</h2>
           {habits.map(habit => (
-            <div key={habit.id} className="habit-row">
+            <div key={habit.id} className={`habit-row${habit.value < 0 ? ' bad-habit' : ''}`}>
               <div className="habit-info">
                 <h3>{habit.name}</h3>
                 <p>{habit.description}</p>
                 <p>Value: {habit.value} points</p>
                 <p>Max per day: {habit.max_completions_per_day === 0 ? 'Unlimited' : habit.max_completions_per_day}</p>
                 <p>Completed today: {habit.completedToday}</p>
+                <div className="habit-progress" aria-label={`Completed ${habit.completedToday} today`}>
+                  <span
+                    style={{
+                      width: `${habit.max_completions_per_day === 0
+                        ? Math.min(habit.completedToday * 20, 100)
+                        : Math.min((habit.completedToday / habit.max_completions_per_day) * 100, 100)}%`,
+                    }}
+                  />
+                </div>
               </div>
               <div className="habit-buttons">
                 <button 
@@ -270,18 +331,10 @@ function App() {
           Create New Habit
         </button>
         
-        {/* Reset daily completions button for demo purposes */}
-        <button 
-          onClick={resetDailyCompletions}
-          className="reset-button"
-        >
-          Reset Daily Completions
-        </button>
-        
         {showCreateForm && (
           <div className="modal">
             <div className="modal-content">
-              <h2>Create New Habit</h2>
+              <h2>Add a habit</h2>
               <input
                 type="text"
                 placeholder="Habit name"
@@ -298,21 +351,53 @@ function App() {
               />
               <input
                 type="number"
-                placeholder="Value (points)"
-                value={newHabit.value || ''}
-                onChange={(e) => setNewHabit({...newHabit, value: parseInt(e.target.value) || 0})}
+                placeholder="Points earned each time"
+                value={valueInput}
+                onChange={(e) => {
+                  const inputValue = e.target.value;
+                  setValueInput(inputValue);
+
+                  const parsedValue = parseHabitValue(inputValue);
+                  if (parsedValue !== null) {
+                    setNewHabit({...newHabit, value: parsedValue});
+                  }
+                }}
                 className="habit-input"
               />
               <input
-                type="text"
-                placeholder="Max completions per day (0 for unlimited)"
-                value={newHabit.max_completions_per_day === 0 ? 'unlimited' : newHabit.max_completions_per_day}
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Times per day"
+                value={maxCompletionsInput}
                 onChange={handleMaxCompletionsChange}
+                disabled={isUnlimited}
                 className="habit-input"
               />
+              <div className="unlimited-option">
+                <input
+                  id="unlimited-completions"
+                  type="checkbox"
+                  checked={isUnlimited}
+                  onChange={handleUnlimitedChange}
+                  className="unlimited-checkbox"
+                />
+                <label htmlFor="unlimited-completions">Unlimited</label>
+              </div>
               <div className="modal-buttons">
                 <button onClick={handleCreateHabit} className="save-button">Save</button>
-                <button onClick={() => setShowCreateForm(false)} className="cancel-button">Cancel</button>
+                <button
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setValueInput('');
+                    setMaxCompletionsInput('1');
+                    setIsUnlimited(false);
+                    setNewHabit({ name: '', description: '', value: 0, max_completions_per_day: 1 });
+                  }}
+                  className="cancel-button"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
