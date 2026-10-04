@@ -10,6 +10,15 @@ const habitsModel = {
     });
   },
 
+  getHabitById: (id) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM habits WHERE id = ?', [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+  },
+
   createHabit: (habitData) => {
     const { name, description, value, max_completions_per_day } = habitData;
     return new Promise((resolve, reject) => {

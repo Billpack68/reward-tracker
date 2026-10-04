@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
+import { api } from './api';
 
 // Define types for our data structures
 interface Habit {
@@ -7,20 +8,25 @@ interface Habit {
   name: string;
   description: string;
   value: number;
-  maxCompletionsPerDay: number; // New field for max completions per day
+  max_completions_per_day: number; // New field for max completions per day (snake_case to match backend)
   completedToday: number; // Track how many times this habit was completed today
 }
 
+// Helper function to get today's date in Mountain Time (UTC-7/UTC-6 depending on DST)
+const getTodayInMountainTime = (): string => {
+  const now = new Date();
+  // Create a date in Mountain Time (UTC-7 or UTC-6)
+  const mountainTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Denver"}));
+  // Format as YYYY-MM-DD
+  return mountainTime.toISOString().split('T')[0];
+};
+
 function App() {
   // State for rewards earned
-  const [rewardsEarned, setRewardsEarned] = useState<number>(150);
+  const [rewardsEarned, setRewardsEarned] = useState<number>(0);
   
   // State for habits
-  const [habits, setHabits] = useState<Habit[]>([
-    { id: 1, name: "Morning Meditation", description: "10 minutes of mindfulness", value: 10, maxCompletionsPerDay: 1, completedToday: 0 },
-    { id: 2, name: "Exercise", description: "30 minutes of physical activity", value: 20, maxCompletionsPerDay: 1, completedToday: 0 },
-    { id: 3, name: "Read Book", description: "Read for 30 minutes", value: 15, maxCompletionsPerDay: 2, completedToday: 0 },
-  ]);
+  const [habits, setHabits] = useState<Habit[]>([]);
   
   // State for new habit form
   const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
@@ -28,57 +34,194 @@ function App() {
     name: '', 
     description: '', 
     value: 0,
-    maxCompletionsPerDay: 1
+    max_completions_per_day: 1
   });
 
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Get current rewards
+        const rewards = await api.getRewards();
+        setRewardsEarned(rewards);
+        
+        // Get all habits
+        const habitData = await api.getHabits();
+        
+        // Get completions for each habit to determine completedToday counts
+        const updatedHabits = await Promise.all(habitData.map(async (habit: any) => {
+          try {
+            // Get today's date in Mountain Time
+            const today = getTodayInMountainTime();
+            
+            // Fetch completions for this habit on today's date
+            const completions = await api.getCompletionsByHabitAndDate(habit.id, today);
+            
+            return {
+              ...habit,
+              completedToday: completions.length // Set completedToday to count of completions for today
+            };
+          } catch (error) {
+            console.error(`Error fetching completions for habit ${habit.id}:`, error);
+            return {
+              ...habit,
+              completedToday: 0
+            };
+          }
+        }));
+        
+        setHabits(updatedHabits);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
+
   // Handle creating a new habit
-  const handleCreateHabit = () => {
+  const handleCreateHabit = async () => {
     if (newHabit.name.trim() === '') return;
     
-    const habit: Habit = {
-      ...newHabit,
-      id: habits.length + 1,
-      completedToday: 0
-    };
-    
-    setHabits([...habits, habit]);
-    setShowCreateForm(false);
-    setNewHabit({ name: '', description: '', value: 0, maxCompletionsPerDay: 1 });
+    try {
+      // Create the new habit via API
+      const createdHabit = await api.createHabit(newHabit);
+      
+      // Refresh habits list to get updated data
+      const habitData = await api.getHabits();
+      
+      // Get completions for each habit to determine completedToday counts
+      const updatedHabits = await Promise.all(habitData.map(async (habit: any) => {
+        try {
+          // Get today's date in Mountain Time
+          const today = getTodayInMountainTime();
+          
+          // Fetch completions for this habit on today's date
+          const completions = await api.getCompletionsByHabitAndDate(habit.id, today);
+          
+          return {
+            ...habit,
+            completedToday: completions.length // Set completedToday to count of completions for today
+          };
+        } catch (error) {
+          console.error(`Error fetching completions for habit ${habit.id}:`, error);
+          return {
+            ...habit,
+            completedToday: 0
+          };
+        }
+      }));
+      
+      setHabits(updatedHabits);
+      
+      setShowCreateForm(false);
+      setNewHabit({ name: '', description: '', value: 0, max_completions_per_day: 1 });
+    } catch (error) {
+      console.error('Error creating habit:', error);
+    }
   };
 
   // Handle completing a habit
-  const handleCompleteHabit = (id: number) => {
-    setHabits(habits.map(habit => {
-      // Check if this habit has reached its daily limit
-      if (habit.id === id) {
-        // If maxCompletionsPerDay is 0, it means unlimited completions
-        if (habit.maxCompletionsPerDay !== 0 && habit.completedToday >= habit.maxCompletionsPerDay) {
-          return habit; // Don't allow completion if limit reached
-        }
-        
-        // Increase rewards and completed count
-        setRewardsEarned(rewardsEarned + habit.value);
-        return { 
-          ...habit, 
-          completedToday: habit.completedToday + 1 
-        };
+  const handleCompleteHabit = async (id: number) => {
+    try {
+      // Record the new completion via API with today's date in Mountain Time
+      const today = getTodayInMountainTime();
+      const result = await api.createCompletion({ 
+        habit_id: id,
+        completed_date: today
+      });
+      
+      // Update rewards with the returned value from the completion creation
+      if (result.rewards !== undefined) {
+        setRewardsEarned(result.rewards);
+      } else {
+        // Fallback to getting rewards directly if not included in response
+        const updatedRewards = await api.getRewards();
+        setRewardsEarned(updatedRewards);
       }
-      return habit;
-    }));
+      
+      // Refresh habits list to update completedToday counts
+      const habitData = await api.getHabits();
+      
+      // Get completions for each habit to determine updated completedToday counts
+      const updatedHabits = await Promise.all(habitData.map(async (habit: any) => {
+        try {
+          // Get today's date in Mountain Time
+          const today = getTodayInMountainTime();
+          
+          // Fetch completions for this habit on today's date
+          const completions = await api.getCompletionsByHabitAndDate(habit.id, today);
+          
+          return {
+            ...habit,
+            completedToday: completions.length // Set completedToday to count of completions for today
+          };
+        } catch (error) {
+          console.error(`Error fetching completions for habit ${habit.id}:`, error);
+          return {
+            ...habit,
+            completedToday: 0
+          };
+        }
+      }));
+      
+      setHabits(updatedHabits);
+    } catch (error) {
+      console.error('Error completing habit:', error);
+    }
+  };
+
+  // Handle deleting a habit
+  const handleDeleteHabit = async (id: number) => {
+    try {
+      // Delete the habit via API
+      await api.deleteHabit(id);
+      
+      // Refresh habits list to remove deleted habit
+      const habitData = await api.getHabits();
+      
+      // Get completions for each habit to determine completedToday counts
+      const updatedHabits = await Promise.all(habitData.map(async (habit: any) => {
+        try {
+          // Get today's date in Mountain Time
+          const today = getTodayInMountainTime();
+          
+          // Fetch completions for this habit on today's date
+          const completions = await api.getCompletionsByHabitAndDate(habit.id, today);
+          
+          return {
+            ...habit,
+            completedToday: completions.length // Set completedToday to count of completions for today
+          };
+        } catch (error) {
+          console.error(`Error fetching completions for habit ${habit.id}:`, error);
+          return {
+            ...habit,
+            completedToday: 0
+          };
+        }
+      }));
+      
+      setHabits(updatedHabits);
+    } catch (error) {
+      console.error('Error deleting habit:', error);
+    }
   };
 
   // Handle input change for maxCompletionsPerDay
   const handleMaxCompletionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === 'unlimited') {
-      setNewHabit({...newHabit, maxCompletionsPerDay: 0});
+      setNewHabit({...newHabit, max_completions_per_day: 0});
     } else {
-      setNewHabit({...newHabit, maxCompletionsPerDay: parseInt(value) || 1});
+      setNewHabit({...newHabit, max_completions_per_day: parseInt(value) || 1});
     }
   };
 
   // Reset daily completions (this would typically be called once per day)
-  const resetDailyCompletions = () => {
+  const resetDailyCompletions = async () => {
+    // In a real app, this would involve calling an API to reset completions
+    // For now, we'll just reset the local state
     setHabits(habits.map(habit => ({ ...habit, completedToday: 0 })));
   };
 
@@ -98,16 +241,24 @@ function App() {
                 <h3>{habit.name}</h3>
                 <p>{habit.description}</p>
                 <p>Value: {habit.value} points</p>
-                <p>Max per day: {habit.maxCompletionsPerDay === 0 ? 'Unlimited' : habit.maxCompletionsPerDay}</p>
+                <p>Max per day: {habit.max_completions_per_day === 0 ? 'Unlimited' : habit.max_completions_per_day}</p>
                 <p>Completed today: {habit.completedToday}</p>
               </div>
-              <button 
-                onClick={() => handleCompleteHabit(habit.id)}
-                disabled={habit.maxCompletionsPerDay !== 0 && habit.completedToday >= habit.maxCompletionsPerDay}
-                className="complete-button"
-              >
-                Complete
-              </button>
+              <div className="habit-buttons">
+                <button 
+                  onClick={() => handleCompleteHabit(habit.id)}
+                  disabled={habit.max_completions_per_day !== 0 && habit.completedToday >= habit.max_completions_per_day}
+                  className="complete-button"
+                >
+                  Complete
+                </button>
+                <button 
+                  onClick={() => handleDeleteHabit(habit.id)}
+                  className="delete-button"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -155,7 +306,7 @@ function App() {
               <input
                 type="text"
                 placeholder="Max completions per day (0 for unlimited)"
-                value={newHabit.maxCompletionsPerDay === 0 ? 'unlimited' : newHabit.maxCompletionsPerDay}
+                value={newHabit.max_completions_per_day === 0 ? 'unlimited' : newHabit.max_completions_per_day}
                 onChange={handleMaxCompletionsChange}
                 className="habit-input"
               />

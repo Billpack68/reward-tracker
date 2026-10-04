@@ -30,6 +30,21 @@ const completionsModel = {
     });
   },
 
+  getCompletionsByHabitIdAndDate: (habitId, date) => {
+    return new Promise((resolve, reject) => {
+      db.all(`
+        SELECT c.*, h.name as habit_name 
+        FROM completions c 
+        JOIN habits h ON c.habit_id = h.id
+        WHERE c.habit_id = ? AND c.completed_date = ?
+        ORDER BY c.completed_time DESC
+      `, [habitId, date], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  },
+
   createCompletion: (completionData) => {
     const { habit_id, completed_date, previous_rewards, new_rewards } = completionData;
     return new Promise((resolve, reject) => {
